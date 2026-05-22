@@ -1,0 +1,59 @@
+@import "tailwindcss";
+
+@theme {
+  --color-background: #0a0f0d;
+  --color-surface: #121c17;
+  --color-primary: #00ff3f;
+  --color-secondary: #00cc32;
+  --color-accent: #00ffcc;
+  --color-textMain: #ffffff;
+  --color-textMuted: #8da396;
+  
+  --font-sans: "Inter", sans-serif;
+  --font-display: "Outfit", sans-serif;
+  
+  --shadow-neon: 0 0 15px rgba(0, 255, 63, 0.5);
+  --shadow-neon-strong: 0 0 25px rgba(0, 255, 63, 0.8);
+}
+
+@layer base {
+  body {
+    @apply bg-background text-textMain font-sans overflow-x-hidden;
+  }
+  h1, h2, h3, h4, h5, h6 {
+    @apply font-display tracking-wide;
+  }
+}
+
+@layer components {
+  .glass-panel {
+    @apply bg-surface/80 backdrop-blur-md border border-white/10 shadow-[0_0_15px_rgba(0,255,63,0.1)];
+  }
+  
+  .btn-primary {
+    @apply bg-primary hover:bg-primary/80 text-background font-bold py-2 px-6 rounded-lg transition-all duration-300 shadow-neon hover:shadow-neon-strong uppercase tracking-wider cursor-pointer;
+  }
+  
+  .btn-secondary {
+    @apply bg-transparent border border-secondary text-secondary hover:bg-secondary/20 font-bold py-2 px-6 rounded-lg transition-all duration-300 uppercase tracking-wider cursor-pointer;
+  }
+  
+  .input-field {
+    @apply w-full bg-surface/50 border border-white/20 rounded-lg px-4 py-3 text-white placeholder-textMuted focus:outline-none focus:border-secondary focus:ring-1 focus:ring-secondary transition-all;
+  }
+}
+
+/* Custom scrollbar */
+::-webkit-scrollbar {
+  width: 8px;
+}
+::-webkit-scrollbar-track {
+  background: #0a0f0d;
+}
+::-webkit-scrollbar-thumb {
+  background: #121c17;
+  border-radius: 4px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #00ff3f;
+}
