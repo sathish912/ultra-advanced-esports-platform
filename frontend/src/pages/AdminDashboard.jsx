@@ -31,13 +31,17 @@ export default function AdminDashboard() {
   const [showInstantMatch, setShowInstantMatch] = useState(false);
   const [instantMatch, setInstantMatch] = useState({
     game: 'BGMI',
+    match_type: '1v1',
     player1_id: '',
     player2_id: '',
+    team1_id: '',
+    team2_id: '',
     prize_pool: 0,
     banner: 'http://localhost:8000/static/banners/mrgamer.png',
     stream_url: ''
   });
   const [allPlayers, setAllPlayers] = useState([]);
+  const [allTeams, setAllTeams] = useState([]);
 
   // Registrations State
   const [registrations, setRegistrations] = useState([]);
@@ -57,6 +61,10 @@ export default function AdminDashboard() {
   // Platform Analytics State
   const [analytics, setAnalytics] = useState(null);
   const [loadingAnalytics, setLoadingAnalytics] = useState(false);
+
+  // Digital Contracts State
+  const [adminContracts, setAdminContracts] = useState([]);
+  const [adminPortfolios, setAdminPortfolios] = useState([]);
 
   // Security & Disputes State
   const [flaggedUsers, setFlaggedUsers] = useState([]);
@@ -142,8 +150,12 @@ export default function AdminDashboard() {
 
   const fetchPlayers = async () => {
     try {
-      const res = await api.get('/admin/users');
-      setAllPlayers(res.data);
+      const [pRes, tRes] = await Promise.all([
+        api.get('/admin/users'),
+        api.get('/lobby/admin/teams')
+      ]);
+      setAllPlayers(pRes.data);
+      setAllTeams(tRes.data);
     } catch (err) {
       console.error(err);
     }
@@ -152,8 +164,30 @@ export default function AdminDashboard() {
   useEffect(() => {
     if (activeTab === 'security') {
       fetchSecurityData();
+    } else if (activeTab === 'contracts') {
+      fetchAdminContracts();
+    } else if (activeTab === 'portfolios') {
+      fetchAdminPortfolios();
     }
   }, [activeTab]);
+
+  const fetchAdminContracts = async () => {
+    try {
+      const res = await api.get('/career/admin/contracts');
+      setAdminContracts(res.data);
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
+  const fetchAdminPortfolios = async () => {
+    try {
+      const res = await api.get('/career/admin/portfolios');
+      setAdminPortfolios(res.data);
+    } catch (err) {
+      console.error(err);
+    }
+  };
 
   // Referee Matches
   useEffect(() => {
@@ -191,16 +225,29 @@ export default function AdminDashboard() {
 
   const handleInstantMatchSubmit = async (e) => {
     e.preventDefault();
-    if (instantMatch.player1_id === instantMatch.player2_id) {
+    if (instantMatch.match_type === '1v1' && instantMatch.player1_id === instantMatch.player2_id) {
       alert("Please select two different players.");
       return;
     }
+    if (instantMatch.match_type === 'Squad' && instantMatch.team1_id === instantMatch.team2_id) {
+      alert("Please select two different teams.");
+      return;
+    }
     try {
-      await api.post('/admin/instant-match', {
-        ...instantMatch,
-        player1_id: Number(instantMatch.player1_id),
-        player2_id: Number(instantMatch.player2_id)
-      });
+      const payload = { ...instantMatch };
+      if (payload.match_type === '1v1') {
+        payload.player1_id = Number(payload.player1_id);
+        payload.player2_id = Number(payload.player2_id);
+        payload.team1_id = null;
+        payload.team2_id = null;
+      } else {
+        payload.team1_id = Number(payload.team1_id);
+        payload.team2_id = Number(payload.team2_id);
+        payload.player1_id = null;
+        payload.player2_id = null;
+      }
+
+      await api.post('/admin/instant-match', payload);
       setShowInstantMatch(false);
       alert("Instant match successfully initiated!");
       fetchTournaments();
@@ -248,6 +295,28 @@ export default function AdminDashboard() {
   };
 
   // Registration Actions
+  const handleBanPlayer = async (userId) => {
+    if (!window.confirm("Are you sure you want to ban this player?")) return;
+    try {
+      await api.patch(`/admin/users/${userId}/ban`);
+      toast.success('Player banned successfully');
+      fetchAdminPortfolios();
+    } catch (err) {
+      toast.error('Failed to ban player');
+    }
+  };
+
+  const staticAvatars = [
+    '/static/avatars/avatar1.png',
+    '/static/avatars/avatar2.png',
+    '/static/avatars/avatar3.png',
+    '/static/avatars/4.jpg',
+    '/static/avatars/5.jpg',
+    '/static/avatars/6.jpg',
+    '/static/avatars/7.jpg',
+    '/static/avatars/8.jpg'
+  ];
+
   const handleRegDecision = async (id, decision) => {
     try {
       await api.patch(`/registrations/${id}`, { status: decision });
@@ -367,6 +436,8 @@ export default function AdminDashboard() {
           { id: 'referee', label: 'Referee Desk', icon: Trophy },
           { id: 'analytics', label: 'Analytics Panel', icon: BarChart3 },
           { id: 'security', label: 'Security & Disputes', icon: ShieldAlert },
+          { id: 'contracts', label: 'Digital Contracts', icon: FileText },
+          { id: 'portfolios', label: 'Player Portfolios', icon: Users },
         ].map(tab => {
           const Icon = tab.icon;
           return (
@@ -420,7 +491,7 @@ export default function AdminDashboard() {
                 >
                   <div className="glass-panel p-6 rounded-2xl border border-white/10 mb-6 bg-surface/30">
                     <h4 className="text-lg font-bold text-primary mb-4 flex items-center gap-2">
-                      <Sparkles size={20} /> Initialize Instant 1v1 Match
+                      <Sparkles size={20} /> Initialize Instant Match
                     </h4>
                     <form onSubmit={handleInstantMatchSubmit} className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
                       <div>
@@ -433,19 +504,48 @@ export default function AdminDashboard() {
                         </select>
                       </div>
                       <div>
-                        <label className="block text-xs font-bold text-textMuted uppercase mb-1">Player 1</label>
-                        <select className="input-field" required value={instantMatch.player1_id} onChange={e => setInstantMatch({...instantMatch, player1_id: e.target.value})}>
-                          <option value="" disabled>Select Player 1</option>
-                          {allPlayers.map(p => <option key={p.id} value={p.id}>{p.name} ({p.email})</option>)}
+                        <label className="block text-xs font-bold text-textMuted uppercase mb-1">Combat Type</label>
+                        <select className="input-field" value={instantMatch.match_type} onChange={e => setInstantMatch({...instantMatch, match_type: e.target.value})}>
+                          <option value="1v1">Solo (1v1)</option>
+                          <option value="Squad">Squad</option>
                         </select>
                       </div>
-                      <div>
-                        <label className="block text-xs font-bold text-textMuted uppercase mb-1">Player 2</label>
-                        <select className="input-field" required value={instantMatch.player2_id} onChange={e => setInstantMatch({...instantMatch, player2_id: e.target.value})}>
-                          <option value="" disabled>Select Player 2</option>
-                          {allPlayers.map(p => <option key={p.id} value={p.id}>{p.name} ({p.email})</option>)}
-                        </select>
-                      </div>
+
+                      {instantMatch.match_type === '1v1' ? (
+                        <>
+                          <div>
+                            <label className="block text-xs font-bold text-textMuted uppercase mb-1">Player 1</label>
+                            <select className="input-field" required value={instantMatch.player1_id} onChange={e => setInstantMatch({...instantMatch, player1_id: e.target.value})}>
+                              <option value="" disabled>Select Player 1</option>
+                              {allPlayers.map(p => <option key={p.id} value={p.id}>{p.name} ({p.email})</option>)}
+                            </select>
+                          </div>
+                          <div>
+                            <label className="block text-xs font-bold text-textMuted uppercase mb-1">Player 2</label>
+                            <select className="input-field" required value={instantMatch.player2_id} onChange={e => setInstantMatch({...instantMatch, player2_id: e.target.value})}>
+                              <option value="" disabled>Select Player 2</option>
+                              {allPlayers.map(p => <option key={p.id} value={p.id}>{p.name} ({p.email})</option>)}
+                            </select>
+                          </div>
+                        </>
+                      ) : (
+                        <>
+                          <div>
+                            <label className="block text-xs font-bold text-textMuted uppercase mb-1">Team 1</label>
+                            <select className="input-field" required value={instantMatch.team1_id} onChange={e => setInstantMatch({...instantMatch, team1_id: e.target.value})}>
+                              <option value="" disabled>Select Team 1</option>
+                              {allTeams.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
+                            </select>
+                          </div>
+                          <div>
+                            <label className="block text-xs font-bold text-textMuted uppercase mb-1">Team 2</label>
+                            <select className="input-field" required value={instantMatch.team2_id} onChange={e => setInstantMatch({...instantMatch, team2_id: e.target.value})}>
+                              <option value="" disabled>Select Team 2</option>
+                              {allTeams.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
+                            </select>
+                          </div>
+                        </>
+                      )}
                       <div>
                         <label className="block text-xs font-bold text-textMuted uppercase mb-1">Prize Pool (₹)</label>
                         <input type="number" className="input-field" value={instantMatch.prize_pool} onChange={e => setInstantMatch({...instantMatch, prize_pool: e.target.value})} />
@@ -1027,6 +1127,99 @@ export default function AdminDashboard() {
                 Analytics terminal offline. Check server uvicorn thread.
               </div>
             )}
+          </div>
+        )}
+
+        {/* --- TAB: DIGITAL CONTRACTS --- */}
+        {activeTab === 'contracts' && (
+          <div className="space-y-6">
+            <h3 className="text-xl font-bold text-white uppercase tracking-wider">Digital Contracts</h3>
+            <div className="glass-panel p-6 rounded-2xl bg-surface/20 border border-white/5 overflow-x-auto">
+              {adminContracts.length === 0 ? (
+                <p className="text-sm text-textMuted text-center py-8">No digital contracts found on the platform.</p>
+              ) : (
+                <table className="w-full text-left">
+                  <thead>
+                    <tr className="border-b border-white/10 text-xs font-bold text-gray-400 uppercase tracking-wider">
+                      <th className="pb-3 pr-4">ID</th>
+                      <th className="pb-3 pr-4">Player</th>
+                      <th className="pb-3 pr-4">Team</th>
+                      <th className="pb-3 pr-4">Salary</th>
+                      <th className="pb-3 pr-4">Duration</th>
+                      <th className="pb-3 pr-4">Buyout</th>
+                      <th className="pb-3">Status</th>
+                    </tr>
+                  </thead>
+                  <tbody className="text-sm text-white/90">
+                    {adminContracts.map(contract => (
+                      <tr key={contract.id} className="border-b border-white/5 hover:bg-white/5 transition-colors">
+                        <td className="py-3 pr-4">#{contract.id}</td>
+                        <td className="py-3 pr-4 font-bold">{contract.player_name}</td>
+                        <td className="py-3 pr-4 text-neonGold">{contract.team_name}</td>
+                        <td className="py-3 pr-4">₹{contract.salary}/mo</td>
+                        <td className="py-3 pr-4">{contract.duration_months} mo</td>
+                        <td className="py-3 pr-4">₹{contract.buyout_clause}</td>
+                        <td className="py-3">
+                          <span className={`px-2 py-1 text-[10px] uppercase font-bold rounded ${contract.status === 'Signed' ? 'bg-neonGreen/20 text-neonGreen border border-neonGreen/30' : 'bg-yellow-500/20 text-yellow-500 border border-yellow-500/30'}`}>
+                            {contract.status}
+                          </span>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* --- TAB: PLAYER PORTFOLIOS --- */}
+        {activeTab === 'portfolios' && (
+          <div className="space-y-6">
+            <h3 className="text-xl font-bold text-white uppercase tracking-wider">Player Portfolios</h3>
+            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
+              {adminPortfolios.length === 0 ? (
+                <p className="text-sm text-textMuted text-center py-8 col-span-full">No portfolios found.</p>
+              ) : (
+                adminPortfolios.map(p => {
+                  const resolvedAvatar = (p.user_avatar && p.user_avatar.startsWith('/static/')) 
+                    ? `http://localhost:8000${p.user_avatar}` 
+                    : `http://localhost:8000${staticAvatars[p.user_id % staticAvatars.length]}`;
+                  return (
+                  <div key={p.id} className="glass-panel p-6 rounded-2xl bg-surface/20 border border-white/10 hover:border-neonGold/50 transition-colors">
+                    <div className="flex justify-between items-start mb-4">
+                      <div className="flex items-center gap-4">
+                        <img src={resolvedAvatar} className="w-12 h-12 rounded-full border-2 border-neonGold object-cover" alt="avatar" />
+                        <div>
+                          <h4 className="font-bold text-white text-lg uppercase flex items-center gap-2">
+                            {p.user_name}
+                            {p.is_verified_pro && <ShieldAlert className="w-4 h-4 text-neonGold" />}
+                          </h4>
+                          <p className="text-[10px] text-neonGold uppercase font-bold tracking-wider">MMR: {p.user_mmr}</p>
+                        </div>
+                      </div>
+                      <button 
+                        onClick={() => handleBanPlayer(p.user_id)}
+                        className="text-[10px] bg-red-500/10 hover:bg-red-500/30 border border-red-500/30 text-red-400 px-2 py-1 rounded uppercase font-bold transition-colors cursor-pointer"
+                        title="Ban Player"
+                      >
+                        Ban
+                      </button>
+                    </div>
+                    
+                    <div className="space-y-2 text-xs text-white/80">
+                      <p><span className="text-gray-400 font-bold uppercase mr-2">Roles:</span> {p.preferred_roles || 'Any'}</p>
+                      <p><span className="text-gray-400 font-bold uppercase mr-2">Hardware:</span> {p.hardware_specs || 'Mobile'}</p>
+                      <p><span className="text-gray-400 font-bold uppercase mr-2">Status:</span> {p.looking_for_team ? (
+                        <span className="text-neonGreen">Looking for Team</span>
+                      ) : (
+                        <span className="text-yellow-500">In a Squad</span>
+                      )}</p>
+                    </div>
+                  </div>
+                )})
+              )}
+            </div>
           </div>
         )}
 

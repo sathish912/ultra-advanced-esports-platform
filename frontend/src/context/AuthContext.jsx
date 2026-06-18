@@ -7,29 +7,35 @@ export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    const fetchUser = async () => {
-      const token = localStorage.getItem('token');
-      if (token) {
-        try {
-          const response = await api.get('/profile');
-          setUser(response.data);
-        } catch (error) {
-          console.error('Error fetching profile:', error);
-          localStorage.removeItem('token');
-        }
+  const fetchUser = async () => {
+    const token = localStorage.getItem('token');
+    if (token) {
+      try {
+        const response = await api.get('/profile');
+        setUser(response.data);
+      } catch (error) {
+        console.error('Error fetching profile:', error);
+        localStorage.removeItem('token');
       }
-      setLoading(false);
-    };
+    }
+    setLoading(false);
+  };
 
+  useEffect(() => {
     fetchUser();
   }, []);
 
-  const login = async (email, password) => {
+  const login = async (email, password, mfaToken = null, fingerprint = 'unknown') => {
     try {
       const params = new URLSearchParams();
       params.append('username', email);
       params.append('password', password);
+      
+      const clientSecretObj = { fingerprint };
+      if (mfaToken) {
+        clientSecretObj.mfa_token = mfaToken;
+      }
+      params.append('client_secret', JSON.stringify(clientSecretObj));
       
       const response = await api.post('/login', params, {
         headers: {
@@ -59,7 +65,7 @@ export const AuthProvider = ({ children }) => {
   };
 
   return (
-    <AuthContext.Provider value={{ user, setUser, login, logout, register, loading }}>
+    <AuthContext.Provider value={{ user, setUser, login, logout, register, loading, fetchUser }}>
       {!loading && children}
     </AuthContext.Provider>
   );

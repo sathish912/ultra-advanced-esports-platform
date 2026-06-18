@@ -2,6 +2,8 @@ import React, { useState, useEffect } from 'react';
 import api from '../api';
 import { Trophy, Medal, Award, Globe, Calendar, Clock, Swords, ChevronDown, Crosshair, Crown, BrainCircuit, Sparkles } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
+import RankBadge from '../components/ui/RankBadge';
+import PageHeader from '../components/layout/PageHeader';
 
 export default function Leaderboard() {
   const [leaderboard, setLeaderboard] = useState([]);
@@ -88,20 +90,20 @@ export default function Leaderboard() {
     return `AI ANALYSIS: Operative ${top.name} is currently dominating the ${leaderboardType.toLowerCase()} matrix with a ${topWinRate}% win rate and ${top.kills} confirmed kills. They are demonstrating S-Tier strategic mechanics. Expect heavy resistance if matched against them.`;
   };
 
+  const subtitleMap = {
+    Global: 'Top operatives on the Ultra network',
+    Weekly: 'Last 7 days — weekly war zone',
+    Seasonal: '90-day seasonal campaign',
+    Tournament: 'Selected tournament standings',
+  };
+
   return (
-    <div className="max-w-7xl mx-auto p-6 space-y-8">
-      <div className="text-center border-b border-white/10 pb-8">
-        <Trophy size={48} className="mx-auto text-primary mb-4" />
-        <h1 className="text-4xl font-display font-bold text-white uppercase tracking-widest mb-2">
-          {leaderboardType} Rankings
-        </h1>
-        <p className="text-textMuted uppercase tracking-wider text-sm">
-          {leaderboardType === 'Global' && 'Top operatives on the network'}
-          {leaderboardType === 'Weekly' && 'Top operatives in the last 7 days'}
-          {leaderboardType === 'Seasonal' && 'Top operatives in the current season (90 days)'}
-          {leaderboardType === 'Tournament' && 'Top operatives in the selected tournament'}
-        </p>
-      </div>
+    <div className="max-w-7xl mx-auto p-4 md:p-8 space-y-8 relative z-10">
+      <PageHeader
+        badge="Competitive Rankings"
+        title={`${leaderboardType} Leaderboard`}
+        subtitle={subtitleMap[leaderboardType]}
+      />
 
       {/* Tabs */}
       <div className="flex flex-wrap justify-center gap-2 mb-6">
@@ -218,8 +220,9 @@ export default function Leaderboard() {
                       <div className="w-8 h-8 rounded bg-surface border border-white/10 flex items-center justify-center shrink-0">
                         <span className="text-xs text-primary">{player.name.substring(0,2).toUpperCase()}</span>
                       </div>
-                      <div className="flex flex-col">
+                      <div className="flex flex-col gap-1">
                         <span className="truncate">{player.name}</span>
+                        <RankBadge points={player.points} size="sm" />
                         {player.achievements && (
                           <div className="flex gap-1 mt-1">
                             {player.achievements.split(',').map((ach, i) => (

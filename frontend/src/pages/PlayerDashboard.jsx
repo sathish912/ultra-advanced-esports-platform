@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import api from '../api';
-import { Swords, Trophy, Activity, Medal, Bell, X, Check, Calendar, Crosshair, Sparkles, LogIn, AlertTriangle } from 'lucide-react';
+import { Swords, Trophy, Activity, Medal, Bell, X, Check, Calendar, Crosshair, Sparkles, LogIn, AlertTriangle, Users } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useAuth } from '../context/AuthContext';
 
@@ -16,7 +16,72 @@ export default function PlayerDashboard() {
   const [disputeModalOpen, setDisputeModalOpen] = useState(false);
   const [selectedMatch, setSelectedMatch] = useState(null);
   const [disputeReason, setDisputeReason] = useState("");
+  const [ownedClan, setOwnedClan] = useState(null);
+  const [clanRequests, setClanRequests] = useState([]);
   const wsRef = useRef(null);
+
+  const fetchMatches = async () => {
+    try {
+      setMatchFetchStatus("fetching");
+      const res = await api.get('/matches');
+      setMatchFetchStatus("fetched:" + res.data.length);
+      setAllMatches(res.data);
+    } catch (err) {
+      setMatchFetchStatus("error:" + err.message);
+      console.error('Error fetching matches:', err);
+    }
+  };
+
+  const fetchUserData = async () => {
+    try {
+      const [pRes, tRes, allTRes, clansRes] = await Promise.all([
+        api.get('/profile'),
+        api.get('/my-tournaments'),
+        api.get('/tournaments'),
+        api.get('/clans')
+      ]);
+      setProfile(pRes.data);
+      setUser(pRes.data); // Update Auth context
+      setMyTournaments(tRes.data);
+      
+      // Map tournaments for ID lookup
+      const mapping = {};
+      allTRes.data.forEach(t => {
+        mapping[t.id] = t;
+      });
+      setTournamentsMap(mapping);
+      
+      // Check if user owns a clan
+      const userClan = clansRes.data.find(c => c.leader_id === pRes.data.id);
+      if (userClan) {
+        setOwnedClan(userClan);
+        api.get(`/clans/${userClan.id}/requests`).then(reqs => {
+          setClanRequests(reqs.data);
+        }).catch(err => console.error("Error fetching clan requests:", err));
+      }
+
+      fetchMatches();
+    } catch (err) {
+      console.error('Error fetching player metadata:', err);
+    }
+  };
+
+  const fetchNotifications = async () => {
+    try {
+      const res = await api.get('/notifications');
+      setNotifications(res.data);
+    } catch (err) {
+      console.error('Error fetching alerts:', err);
+    }
+  };
+
+  const showToast = (notif) => {
+    const id = Date.now();
+    setToasts(prev => [...prev, { id, ...notif }]);
+    setTimeout(() => {
+      setToasts(prev => prev.filter(t => t.id !== id));
+    }, 5000);
+  };
 
   useEffect(() => {
     fetchUserData();
@@ -54,60 +119,7 @@ export default function PlayerDashboard() {
     };
   }, []);
 
-  const fetchUserData = async () => {
-    try {
-      const [pRes, tRes, allTRes] = await Promise.all([
-        api.get('/profile'),
-        api.get('/my-tournaments'),
-        api.get('/tournaments')
-      ]);
-      setProfile(pRes.data);
-      setUser(pRes.data); // Update Auth context
-      setMyTournaments(tRes.data);
-      
-      // Map tournaments for ID lookup
-      const mapping = {};
-      allTRes.data.forEach(t => {
-        mapping[t.id] = t;
-      });
-      setTournamentsMap(mapping);
-      
-      fetchMatches();
-    } catch (err) {
-      console.error('Error fetching player metadata:', err);
-    }
-  };
-
   const [matchFetchStatus, setMatchFetchStatus] = useState("pending");
-
-  const fetchMatches = async () => {
-    try {
-      setMatchFetchStatus("fetching");
-      const res = await api.get('/matches');
-      setMatchFetchStatus("fetched:" + res.data.length);
-      setAllMatches(res.data);
-    } catch (err) {
-      setMatchFetchStatus("error:" + err.message);
-      console.error('Error fetching matches:', err);
-    }
-  };
-
-  const fetchNotifications = async () => {
-    try {
-      const res = await api.get('/notifications');
-      setNotifications(res.data);
-    } catch (err) {
-      console.error('Error fetching alerts:', err);
-    }
-  };
-
-  const showToast = (notif) => {
-    const id = Date.now();
-    setToasts(prev => [...prev, { id, ...notif }]);
-    setTimeout(() => {
-      setToasts(prev => prev.filter(t => t.id !== id));
-    }, 5000);
-  };
 
   const handleMarkAsRead = async (id) => {
     try {
@@ -125,6 +137,29 @@ export default function PlayerDashboard() {
       setNotifications(prev => prev.map(n => ({ ...n, is_read: true })));
     } catch (err) {
       console.error(err);
+      showToast({ title: "Error", message: "Failed to mark all as read." });
+    }
+  };
+
+  const handleAcceptRequest = async (reqId) => {
+    try {
+      await api.post(`/clans/requests/${reqId}/accept`);
+      setClanRequests(prev => prev.filter(r => r.id !== reqId));
+      showToast({ title: "Request Accepted", message: "Player has joined your squad!" });
+    } catch (err) {
+      console.error(err);
+      showToast({ title: "Error", message: "Failed to accept request." });
+    }
+  };
+
+  const handleRejectRequest = async (reqId) => {
+    try {
+      await api.post(`/clans/requests/${reqId}/reject`);
+      setClanRequests(prev => prev.filter(r => r.id !== reqId));
+      showToast({ title: "Request Rejected", message: "Player application denied." });
+    } catch (err) {
+      console.error(err);
+      showToast({ title: "Error", message: "Failed to reject request." });
     }
   };
 
@@ -182,29 +217,40 @@ export default function PlayerDashboard() {
         </AnimatePresence>
       </div>
 
-      {/* Header and Stats */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between border-b border-white/10 pb-6 gap-4">
-        <div>
-          <h1 className="text-3xl font-display font-bold text-white uppercase tracking-wider mb-2 flex items-center gap-3">
-            <Swords className="text-primary animate-pulse" size={32} />
-            Player Headquarters
-          </h1>
-        <p className="text-textMuted">Welcome back, Agent <span className="text-primary font-bold">{profile.name}</span>. Monitor your active campaigns and ratings.</p>
-        </div>
+      {/* Header Banner */}
+      <div className="relative rounded-2xl overflow-hidden mb-8 h-48 border border-white/10 shadow-[0_0_30px_rgba(0,255,63,0.1)] group">
+        <img 
+          src="https://images.unsplash.com/photo-1542751371-adc38448a05e?auto=format&fit=crop&q=80" 
+          alt="Gaming Banner" 
+          className="absolute inset-0 w-full h-full object-cover group-hover:scale-105 transition-transform duration-700"
+        />
+        <div className="absolute inset-0 bg-gradient-to-r from-background via-background/80 to-transparent" />
         
-        {/* Alerts Bell */}
-        <button 
-          onClick={() => setIsDrawerOpen(true)}
-          className="relative glass-panel p-3 rounded-xl border border-white/10 hover:border-primary/50 text-white transition-all cursor-pointer flex items-center gap-2 group"
-        >
-          <Bell size={20} className="group-hover:rotate-12 transition-transform" />
-          <span className="text-xs uppercase font-bold tracking-wider hidden sm:inline">Alert Feed</span>
-          {unreadCount > 0 && (
-            <span className="absolute -top-1.5 -right-1.5 flex h-5 w-5 items-center justify-center rounded-full bg-red-500 text-[10px] font-bold text-white ring-2 ring-background animate-bounce">
-              {unreadCount}
-            </span>
-          )}
-        </button>
+        <div className="relative z-10 h-full flex flex-col md:flex-row md:items-center justify-between p-8 gap-4">
+          <div>
+            <h1 className="text-4xl md:text-5xl font-display font-bold text-white uppercase tracking-wider mb-2 flex items-center gap-3 shadow-black drop-shadow-xl">
+              <Swords className="text-primary animate-pulse shadow-primary drop-shadow-xl" size={40} />
+              Player Headquarters
+            </h1>
+            <p className="text-textMuted max-w-xl text-lg drop-shadow-md">
+              Welcome back, Agent <span className="text-primary font-bold">{profile.name}</span>. Monitor your active campaigns and ratings.
+            </p>
+          </div>
+          
+          {/* Alerts Bell */}
+          <button 
+            onClick={() => setIsDrawerOpen(true)}
+            className="relative glass-panel bg-background/50 backdrop-blur-md p-4 rounded-xl border border-white/10 hover:border-primary/50 text-white transition-all cursor-pointer flex items-center gap-3 group mt-4 md:mt-0"
+          >
+            <Bell size={24} className="group-hover:rotate-12 transition-transform text-primary" />
+            <span className="text-sm uppercase font-bold tracking-wider hidden sm:inline">Alert Feed</span>
+            {unreadCount > 0 && (
+              <span className="absolute -top-2 -right-2 flex h-6 w-6 items-center justify-center rounded-full bg-red-500 text-xs font-bold text-white ring-2 ring-background animate-bounce shadow-[0_0_10px_rgba(239,68,68,0.5)]">
+                {unreadCount}
+              </span>
+            )}
+          </button>
+        </div>
       </div>
 
       {/* Earned Accolades */}
@@ -297,6 +343,42 @@ export default function PlayerDashboard() {
                     </div>
                   </div>
                 ))}
+              </div>
+            )}
+
+            {/* Pending Clan Requests Widget */}
+            {ownedClan && clanRequests.length > 0 && (
+              <div className="mt-8">
+                <h2 className="text-xl font-display font-bold text-white uppercase tracking-wider mb-4 border-b border-white/10 pb-2 flex items-center gap-2">
+                  <Users size={18} className="text-primary" /> {/* Note: Assuming Users is imported or using LogIn */}
+                  Clan Applications
+                </h2>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {clanRequests.map(r => (
+                    <div key={r.id} className="glass-panel p-4 rounded-xl border border-white/5 bg-surface/30 flex justify-between items-center">
+                      <div>
+                        <p className="text-white font-bold text-sm">{r.user?.name}</p>
+                        <span className="text-[10px] text-textMuted uppercase tracking-wider">{new Date(r.created_at).toLocaleDateString()}</span>
+                      </div>
+                      <div className="flex gap-2">
+                        <button 
+                          onClick={() => handleAcceptRequest(r.id)} 
+                          className="bg-green-500/20 hover:bg-green-500/40 text-green-500 border border-green-500/50 p-2 rounded cursor-pointer transition-colors"
+                          title="Accept"
+                        >
+                          <Check size={16} />
+                        </button>
+                        <button 
+                          onClick={() => handleRejectRequest(r.id)} 
+                          className="bg-red-500/20 hover:bg-red-500/40 text-red-500 border border-red-500/50 p-2 rounded cursor-pointer transition-colors"
+                          title="Reject"
+                        >
+                          <X size={16} />
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
               </div>
             )}
           </div>
