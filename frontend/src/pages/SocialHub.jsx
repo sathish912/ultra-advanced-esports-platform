@@ -37,6 +37,8 @@ export default function SocialHub() {
   const [clanToBan, setClanToBan] = useState(null);
   const [banReason, setBanReason] = useState('');
   const [showMembersModal, setShowMembersModal] = useState(false);
+  const [viewingClanData, setViewingClanData] = useState(null);
+  const [clanDashboardTab, setClanDashboardTab] = useState('Main Menu');
   const [clanMembers, setClanMembers] = useState([]);
   const [viewingClanName, setViewingClanName] = useState('');
   const [showRequestsModal, setShowRequestsModal] = useState(false);
@@ -245,6 +247,8 @@ export default function SocialHub() {
       const res = await api.get(`/clans/${clan.id}/members`);
       setClanMembers(res.data);
       setViewingClanName(clan.name);
+      setViewingClanData(clan);
+      setClanDashboardTab('Main Menu');
       setShowMembersModal(true);
     } catch (err) {
       toast.error('Failed to fetch members');
@@ -701,37 +705,194 @@ export default function SocialHub() {
         )}
       </AnimatePresence>
 
-      {/* Members Modal */}
+      {/* Clan Dashboard Modal (Replacing old Members Modal) */}
       <AnimatePresence>
-        {showMembersModal && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-background/80 backdrop-blur-sm">
+        {showMembersModal && viewingClanData && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4 bg-background/90 backdrop-blur-md">
             <motion.div 
               initial={{ opacity: 0, scale: 0.95 }}
               animate={{ opacity: 1, scale: 1 }}
               exit={{ opacity: 0, scale: 0.95 }}
-              className="bg-surface border border-primary/20 rounded-2xl p-6 w-full max-w-sm shadow-2xl flex flex-col max-h-[80vh]"
+              className="bg-[#111318] border border-white/10 rounded-xl w-full max-w-6xl shadow-2xl flex flex-col md:flex-row h-[90vh] md:h-[80vh] overflow-hidden relative"
             >
-              <div className="flex justify-between items-center mb-4">
-                <h2 className="text-xl font-bold text-white uppercase tracking-wider flex items-center gap-2">
-                  <Users className="text-primary" /> {viewingClanName}
-                </h2>
-                <button onClick={() => setShowMembersModal(false)} className="text-textMuted hover:text-white cursor-pointer"><X className="w-5 h-5"/></button>
-              </div>
-              <div className="overflow-y-auto space-y-2 custom-scrollbar pr-2">
-                {clanMembers.length === 0 ? (
-                  <p className="text-textMuted text-sm text-center py-4">No members found.</p>
-                ) : (
-                  clanMembers.map(m => (
-                    <div key={m.id} className="bg-black/40 p-3 rounded-lg border border-white/5 flex justify-between items-center">
-                      <div>
-                        <p className="text-white font-bold text-sm">{m.user?.name}</p>
-                        <p className="text-textMuted text-xs">{m.role}</p>
+              {/* Left Sidebar - Online/Members List */}
+              <div className="w-full md:w-64 bg-[#1a1c23] border-r border-white/5 flex flex-col h-1/3 md:h-full">
+                <div className="p-3 bg-[#22252e] border-b border-white/5 flex justify-between items-center">
+                  <span className="text-white text-xs font-bold uppercase tracking-wider">Members</span>
+                  <span className="text-primary text-xs font-bold">{clanMembers.length}</span>
+                </div>
+                <div className="flex-1 overflow-y-auto custom-scrollbar">
+                  {clanMembers.map(m => (
+                    <div key={m.id} className="p-3 border-b border-white/5 hover:bg-white/5 cursor-pointer flex items-center gap-3 transition-colors">
+                      <div className="w-10 h-10 rounded-lg bg-surface flex items-center justify-center relative overflow-hidden border border-white/10 shrink-0">
+                        <img src={`https://api.dicebear.com/7.x/avataaars/svg?seed=${m.user?.name}&backgroundColor=transparent`} alt="avatar" className="w-full h-full object-cover" />
+                        <div className="absolute bottom-0 right-0 w-3 h-3 bg-green-500 rounded-full border-2 border-[#1a1c23]"></div>
                       </div>
-                      <span className="text-[10px] text-primary">{new Date(m.joined_at).toLocaleDateString()}</span>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-white font-bold text-sm truncate">{m.user?.name}</p>
+                        <p className="text-textMuted text-[10px] uppercase truncate">{m.role}</p>
+                      </div>
+                      <div className="text-[10px] text-white/40 font-bold">Lv. {Math.floor(Math.random() * 50) + 10}</div>
                     </div>
-                  ))
-                )}
+                  ))}
+                </div>
               </div>
+
+              {/* Main Content Area */}
+              <div className="flex-1 flex flex-col relative h-2/3 md:h-full">
+                
+                {/* Close Button overlay */}
+                <button 
+                  onClick={() => setShowMembersModal(false)} 
+                  className="absolute top-4 right-4 z-10 w-8 h-8 bg-black/50 hover:bg-red-500/80 text-white rounded-full flex items-center justify-center transition-colors cursor-pointer"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+
+                {/* Dashboard Header */}
+                <div className="p-6 pb-0 flex flex-col md:flex-row gap-6 relative">
+                  {/* Clan Emblem */}
+                  <div className="w-32 h-32 md:w-40 md:h-40 rounded-xl bg-black/50 border-2 border-primary shadow-[0_0_15px_rgba(var(--color-primary),0.3)] shrink-0 overflow-hidden relative group">
+                     <img src="/clan_logo_cobra.png" alt="Clan Logo" className="w-full h-full object-cover transform group-hover:scale-110 transition-transform duration-500" />
+                     <div className="absolute bottom-0 inset-x-0 bg-primary/90 text-black text-[10px] font-black text-center py-1 uppercase tracking-widest">
+                       RP Clan
+                     </div>
+                  </div>
+
+                  {/* Clan Info */}
+                  <div className="flex-1 flex flex-col justify-center">
+                    <div className="flex items-center gap-3 mb-2">
+                      <h2 className="text-3xl font-black text-white uppercase tracking-tight">{viewingClanData.name}</h2>
+                      <span className="bg-white/10 px-2 py-0.5 rounded text-xs">🇮🇳</span>
+                    </div>
+                    
+                    {/* Level Bar */}
+                    <div className="flex items-center gap-3 w-full max-w-md mb-4">
+                      <span className="text-neonGold font-bold text-sm">Lv. {Math.floor(viewingClanData.total_xp / 1000) + 1}</span>
+                      <div className="flex-1 h-2 bg-black rounded-full overflow-hidden border border-white/10">
+                        <div className="h-full bg-gradient-to-r from-neonGold to-yellow-200" style={{ width: `${(viewingClanData.total_xp % 1000) / 10}%` }}></div>
+                      </div>
+                      <span className="text-textMuted text-[10px] uppercase">Max</span>
+                    </div>
+
+                    <p className="text-sm text-textMuted italic bg-white/5 p-3 rounded-lg border-l-2 border-primary">
+                      "And we Reach the Maximum"
+                    </p>
+                  </div>
+
+                  {/* Top Right Actions */}
+                  <div className="absolute top-6 right-16 flex gap-4">
+                    <div className="flex items-center gap-2 text-textMuted hover:text-white cursor-pointer text-xs uppercase font-bold transition-colors">
+                      <Check className="w-4 h-4" /> Manage Clan
+                    </div>
+                    <div className="flex items-center gap-2 text-primary hover:text-white cursor-pointer text-xs uppercase font-bold transition-colors">
+                      <UserPlus className="w-4 h-4" /> Invite
+                    </div>
+                  </div>
+                </div>
+
+                {/* Stats Grid */}
+                <div className="grid grid-cols-4 gap-4 px-6 mt-6">
+                  <div className="text-center">
+                    <p className="text-[10px] text-textMuted uppercase mb-1 flex items-center justify-center gap-1">Weekly Energy <span className="w-3 h-3 rounded-full border border-textMuted text-[8px] flex items-center justify-center">?</span></p>
+                    <p className="text-lg font-bold text-neonGold">{viewingClanData.total_xp}</p>
+                  </div>
+                  <div className="text-center">
+                    <p className="text-[10px] text-textMuted uppercase mb-1">Season Energy</p>
+                    <p className="text-lg font-bold text-neonGold">{viewingClanData.total_xp * 4}</p>
+                  </div>
+                  <div className="text-center">
+                    <p className="text-[10px] text-textMuted uppercase mb-1">Weekly Rank</p>
+                    <p className="text-lg font-bold text-white">Top 5%</p>
+                  </div>
+                  <div className="text-center">
+                    <p className="text-[10px] text-textMuted uppercase mb-1">Season Rank</p>
+                    <p className="text-lg font-bold text-white">Top 2%</p>
+                  </div>
+                </div>
+                
+                {/* Season Ends info */}
+                <div className="px-6 text-right mt-2">
+                  <p className="text-[10px] text-textMuted uppercase">Season ends on 9/2026</p>
+                </div>
+
+                {/* Training Banner & Layout Divider */}
+                <div className="px-6 mt-4 flex-1 flex flex-col min-h-0">
+                  {clanDashboardTab === 'Main Menu' && (
+                    <div className="relative w-full h-48 md:h-full rounded-xl overflow-hidden border border-white/10 group cursor-pointer">
+                      <img src="/clan_training_banner.png" alt="Clan Training" className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105" />
+                      <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent"></div>
+                      <div className="absolute bottom-4 right-6 flex items-center gap-2">
+                        <h3 className="text-2xl md:text-4xl font-black text-white italic tracking-tighter" style={{ textShadow: '2px 2px 4px rgba(0,0,0,0.8)' }}>Clan Training</h3>
+                        <div className="flex">
+                          <div className="w-4 h-8 bg-primary/80 -skew-x-12 ml-1"></div>
+                          <div className="w-4 h-8 bg-primary/40 -skew-x-12 ml-1"></div>
+                          <div className="w-4 h-8 bg-primary/20 -skew-x-12 ml-1"></div>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {clanDashboardTab === 'Objectives' && (
+                    <div className="flex-1 bg-[#1a1c23] rounded-xl border border-white/5 p-4 overflow-y-auto custom-scrollbar space-y-6">
+                      {/* Weekly Personal */}
+                      <div>
+                        <div className="flex justify-between items-center mb-2">
+                          <p className="text-xs font-bold text-white uppercase">[Weekly] Personal Energy Objective <span className="text-textMuted font-normal ml-2">7 days</span></p>
+                          <p className="text-xs text-textMuted">Current: <span className="text-neonGold font-bold">20</span></p>
+                        </div>
+                        <div className="h-2 bg-black rounded-full overflow-hidden border border-white/5 relative">
+                          <div className="h-full bg-primary w-[5%]"></div>
+                          {/* Marker */}
+                          <div className="absolute top-1/2 right-0 w-2 h-4 bg-white -translate-y-1/2"></div>
+                        </div>
+                        <div className="flex justify-end mt-1">
+                          <span className="text-[10px] text-textMuted">2000</span>
+                        </div>
+                      </div>
+
+                      {/* Weekly Clan */}
+                      <div>
+                        <div className="flex justify-between items-center mb-2">
+                          <p className="text-xs font-bold text-white uppercase">[Weekly] Clan Energy Objective <span className="text-textMuted font-normal ml-2">7 days</span></p>
+                          <p className="text-xs text-textMuted">Current: <span className="text-neonGold font-bold">20</span></p>
+                        </div>
+                        <div className="h-2 bg-black rounded-full overflow-hidden border border-white/5 relative">
+                          <div className="h-full bg-neonGold w-[2%]"></div>
+                          <div className="absolute top-1/2 right-[30%] w-2 h-4 bg-white/20 -translate-y-1/2"></div>
+                          <div className="absolute top-1/2 right-0 w-2 h-4 bg-white -translate-y-1/2"></div>
+                        </div>
+                        <div className="flex justify-between mt-1 text-[10px] text-textMuted">
+                          <span></span>
+                          <span className="relative left-[70%]">25000</span>
+                          <span>40000</span>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+              </div>
+
+              {/* Right Sidebar - Navigation Tabs */}
+              <div className="w-full md:w-32 bg-[#15171e] border-l border-white/5 flex md:flex-col overflow-x-auto md:overflow-y-auto z-10 shrink-0">
+                <div className="p-4 border-b border-white/5 hidden md:block">
+                  <p className="text-white font-black uppercase tracking-widest text-center">Clan</p>
+                </div>
+                {['Main Menu', 'Objectives', 'Information', 'Shop', 'Rankings', 'Perks'].map(tab => (
+                  <div 
+                    key={tab}
+                    onClick={() => setClanDashboardTab(tab)}
+                    className={`p-4 md:py-6 cursor-pointer border-b md:border-b-0 border-white/5 md:border-l-4 transition-all text-center whitespace-nowrap md:whitespace-normal flex-1 md:flex-none flex items-center justify-center
+                      ${clanDashboardTab === tab 
+                        ? 'bg-gradient-to-r md:bg-gradient-to-b from-primary/20 to-transparent border-primary text-white font-bold' 
+                        : 'border-transparent text-textMuted hover:bg-white/5 hover:text-white'}`}
+                  >
+                    <span className="text-[10px] uppercase tracking-wider">{tab}</span>
+                  </div>
+                ))}
+              </div>
+
             </motion.div>
           </div>
         )}

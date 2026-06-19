@@ -109,3 +109,28 @@ def upgrade_battlepass(db: Session = Depends(database.get_db), current_user: mod
     db.commit()
     db.refresh(progress)
     return {"detail": "Successfully upgraded to Premium Battle Pass", "progress": progress}
+
+@router.get("/battlepass/purchasers")
+def get_battlepass_purchasers(db: Session = Depends(database.get_db), current_user: models.User = Depends(auth.get_current_user)):
+    season = db.query(models.BattlePassSeason).filter(models.BattlePassSeason.is_active == True).first()
+    if not season:
+        return []
+        
+    purchasers = db.query(models.User, models.BattlePassProgress).join(
+        models.BattlePassProgress, models.User.id == models.BattlePassProgress.user_id
+    ).filter(
+        models.BattlePassProgress.bp_season_id == season.id,
+        models.BattlePassProgress.is_premium_unlocked == True
+    ).all()
+    
+    result = []
+    for user, progress in purchasers:
+        result.append({
+            "user_id": user.id,
+            "name": user.name,
+            "email": user.email,
+            "current_xp": progress.current_xp,
+            "level": (progress.current_xp // 100) + 1,
+            "unlocked_at": progress.updated_at
+        })
+    return result

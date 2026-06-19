@@ -8,6 +8,8 @@ export default function AdminDashboard() {
   const [activeTab, setActiveTab] = useState('tournaments');
 
   // Tournaments State
+  const [selectedTournament, setSelectedTournament] = useState(null);
+  const [bpPurchasers, setBpPurchasers] = useState([]);
   const [tournaments, setTournaments] = useState([]);
   const [editingTourney, setEditingTourney] = useState(null);
   const [showCreate, setShowCreate] = useState(false);
@@ -168,8 +170,19 @@ export default function AdminDashboard() {
       fetchAdminContracts();
     } else if (activeTab === 'portfolios') {
       fetchAdminPortfolios();
+    } else if (activeTab === 'battlepass') {
+      fetchBpPurchasers();
     }
   }, [activeTab]);
+
+  const fetchBpPurchasers = async () => {
+    try {
+      const res = await api.get('/marketplace/battlepass/purchasers');
+      setBpPurchasers(res.data);
+    } catch (err) {
+      console.error(err);
+    }
+  };
 
   const fetchAdminContracts = async () => {
     try {
@@ -299,10 +312,10 @@ export default function AdminDashboard() {
     if (!window.confirm("Are you sure you want to ban this player?")) return;
     try {
       await api.patch(`/admin/users/${userId}/ban`);
-      toast.success('Player banned successfully');
+      // toast.success('Player banned successfully');
       fetchAdminPortfolios();
     } catch (err) {
-      toast.error('Failed to ban player');
+      // toast.error('Failed to ban player');
     }
   };
 
@@ -438,6 +451,7 @@ export default function AdminDashboard() {
           { id: 'security', label: 'Security & Disputes', icon: ShieldAlert },
           { id: 'contracts', label: 'Digital Contracts', icon: FileText },
           { id: 'portfolios', label: 'Player Portfolios', icon: Users },
+          { id: 'battlepass', label: 'Battle Pass', icon: Star },
         ].map(tab => {
           const Icon = tab.icon;
           return (
